@@ -1,27 +1,27 @@
 # Web Scraper
 
-CLI-инструмент для парсинга книг с [books.toscrape.com](https://books.toscrape.com/) — легального тренировочного сайта для веб-скрапинга.
+CLI tool for scraping books from [books.toscrape.com](https://books.toscrape.com/) — a legitimate practice website for web scraping.
 
-Собирает название, цену, рейтинг, наличие, категорию и URL каждой книги. Экспортирует в CSV или JSON.
+Collects title, price, rating, availability, category, and URL for each book. Exports to CSV or JSON.
 
 ## Quick Start
 
 ```bash
-git clone https://github.com/user/web-scraper.git
+git clone https://github.com/fedorvorobyov/web-scraper.git
 cd web-scraper
 pip install -r requirements.txt
 
-# Парсить первые 5 страниц каталога
+# Scrape first 5 pages of the catalog
 python -m scraper.main --pages 5 --format csv
 
-# Парсить весь каталог (50 страниц, ~1000 книг)
+# Scrape the entire catalog (50 pages, ~1000 books)
 python -m scraper.main --all --format json
 
-# Парсить конкретную категорию
+# Scrape a specific category
 python -m scraper.main --category "Science" --format csv
 ```
 
-## Пример вывода
+## Example Output
 
 ```
 [INFO] Starting scraper...
@@ -39,62 +39,62 @@ Summary:
   Rating distribution: 5★ 18 | 4★ 23 | 3★ 31 | 2★ 19 | 1★ 9
 ```
 
-## CLI-опции
+## CLI Options
 
-| Флаг | Описание |
-|------|----------|
-| `--pages N` | Парсить первые N страниц каталога |
-| `--all` | Парсить весь каталог |
-| `--category NAME` | Парсить конкретную категорию (регистронезависимо) |
-| `--format csv\|json` | Формат экспорта (по умолчанию: csv) |
-| `--output-dir DIR` | Директория для результатов (по умолчанию: output) |
+| Flag | Description |
+|------|-------------|
+| `--pages N` | Scrape the first N pages of the catalog |
+| `--all` | Scrape the entire catalog |
+| `--category NAME` | Scrape a specific category (case-insensitive) |
+| `--format csv\|json` | Export format (default: csv) |
+| `--output-dir DIR` | Output directory (default: output) |
 
-Режимы `--pages`, `--all` и `--category` взаимоисключающие — нужно выбрать один.
+The `--pages`, `--all`, and `--category` modes are mutually exclusive — pick one.
 
-## Архитектура
+## Architecture
 
 ```
 scraper/
-├── fetcher.py    HTTP-клиент с retry и rate limiting
-├── parser.py     Парсинг HTML → dataclass Book
-├── exporter.py   Сериализация в CSV / JSON
-└── main.py       CLI, оркестрация, статистика
+├── fetcher.py    HTTP client with retry and rate limiting
+├── parser.py     HTML parsing → dataclass Book
+├── exporter.py   Serialization to CSV / JSON
+└── main.py       CLI, orchestration, statistics
 ```
 
-**Fetcher** — `requests.Session` с переиспользованием TCP-соединений (keep-alive). Retry с exponential backoff (1s → 2s → 4s) на ошибки 429/5xx, ConnectionError и Timeout. Управляемая задержка между запросами (rate limiting). Не ретраит 404 и другие клиентские ошибки.
+**Fetcher** — `requests.Session` with TCP connection reuse (keep-alive). Retry with exponential backoff (1s → 2s → 4s) on 429/5xx errors, ConnectionError, and Timeout. Configurable delay between requests (rate limiting). Does not retry 404 and other client errors.
 
-**Parser** — чистые функции парсинга (принимают HTML-строку, возвращают данные). `BooksParser` оркестратор связывает fetcher и парсинг, обходит пагинацию. Поддержка парсинга по категориям с case-insensitive поиском.
+**Parser** — Pure parsing functions (accept HTML string, return data). `BooksParser` orchestrator connects the fetcher and parsing, handles pagination. Supports category parsing with case-insensitive search.
 
-**Exporter** — `dataclasses.asdict` + `csv.DictWriter` / `json.dump`. Имя файла с датой (`books_2026-02-06.csv`). Автоматическое создание директории.
+**Exporter** — `dataclasses.asdict` + `csv.DictWriter` / `json.dump`. Date-stamped filenames (`books_2026-02-06.csv`). Automatic directory creation.
 
-**Main** — `argparse` с mutually exclusive group, `logging` с форматом `[LEVEL] message`, `time.monotonic()` для замера времени, сводная статистика через `collections.Counter`.
+**Main** — `argparse` with mutually exclusive group, `logging` with `[LEVEL] message` format, `time.monotonic()` for timing, summary statistics via `collections.Counter`.
 
-## Тесты
+## Tests
 
 ```bash
 python -m pytest tests/ -v
 ```
 
-76 unit-тестов, все на `unittest.mock` — ни один не делает сетевых запросов.
+76 unit tests, all using `unittest.mock` — none make network requests.
 
-| Модуль | Тестов | Что покрыто |
-|--------|--------|-------------|
-| fetcher | 10 | success, retry на 500, 404 без retry, все retry исчерпаны, rate limiting, backoff delays, ConnectionError, Timeout, request_count, context manager |
+| Module | Tests | Coverage |
+|--------|-------|----------|
+| fetcher | 10 | success, retry on 500, no retry on 404, all retries exhausted, rate limiting, backoff delays, ConnectionError, Timeout, request_count, context manager |
 | parser | 28 | catalog page (title, price, rating, availability, URL, category, empty, out of stock), pagination, categories, book detail, breadcrumb, BooksParser orchestration |
-| exporter | 15 | CSV/JSON создание, заголовки, типы данных, пустой список, trailing newline, строковый путь, ExportError |
-| main | 23 | argparse (все режимы, валидация, mutual exclusion), print_summary, orchestration happy path, FetchError/ParseError/ExportError handling, edge cases |
+| exporter | 15 | CSV/JSON creation, headers, data types, empty list, trailing newline, string path, ExportError |
+| main | 23 | argparse (all modes, validation, mutual exclusion), print_summary, orchestration happy path, FetchError/ParseError/ExportError handling, edge cases |
 
-## Зависимости
+## Dependencies
 
-- **requests** — HTTP-клиент
-- **beautifulsoup4** + **lxml** — парсинг HTML
-- **Python 3.10+** — для `X | Y` type union syntax
+- **requests** — HTTP client
+- **beautifulsoup4** + **lxml** — HTML parsing
+- **Python 3.10+** — for `X | Y` type union syntax
 
-Все остальное — стандартная библиотека: `argparse`, `csv`, `json`, `logging`, `dataclasses`, `collections`, `pathlib`, `time`.
+Everything else is standard library: `argparse`, `csv`, `json`, `logging`, `dataclasses`, `collections`, `pathlib`, `time`.
 
-## Структура данных
+## Data Model
 
-Каждая книга представлена dataclass `Book`:
+Each book is represented as a `Book` dataclass:
 
 ```python
 @dataclass
@@ -106,3 +106,7 @@ class Book:
     category: str      # "Poetry"
     url: str           # absolute URL to book page
 ```
+
+## License
+
+MIT
